@@ -1,5 +1,5 @@
 // В начале файла обозначается пакет (папка), в котором он находится
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.v1;
 // Затем идет импорт внешних классов или функций или из них
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;

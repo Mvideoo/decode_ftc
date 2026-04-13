@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.v1;
 
 public class PIDController {
 
@@ -19,6 +19,8 @@ public class PIDController {
     public double update(double error) {
         long now = System.nanoTime();
         double dt = (now - lastTime) / 1e9;
+        if (dt <= 0) dt = 0.001;
+
         lastTime = now;
 
         integral += error * dt;
