@@ -19,17 +19,66 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 @TeleOp(name = "teleop_decode_2", group = "Main")
 public class teleop_decode_2 extends LinearOpMode {
 
+    // ===== MOTORS =====
+    DcMotor LeftFrontDrive, LeftRearDrive, RightFrontDrive, RightRearDrive;
+    DcMotor Plevaka;
+    Servo  armRotServo2;
+
+    // ===== IMU =====
+    IMU imu;
+
     // ===== VISION =====
     VisionPortal visionPortal = null;
     AprilTagProcessor aprilTag = null;
     boolean visionEnabled = false;
     boolean yPrev = false;
 
+    // ===== PID (AprilTag only) =====
+    PIDController tagRotPID;
+    PIDController tagStrafePID;
+    double headingOffset = 0;
 
 
     @Override
     public void runOpMode() {
 
+        // ===== HARDWARE =====
+        LeftFrontDrive = hardwareMap.get(DcMotor.class, "leftFront");
+        LeftRearDrive = hardwareMap.get(DcMotor.class, "leftBack");
+        RightFrontDrive = hardwareMap.get(DcMotor.class, "rightFront");
+        RightRearDrive = hardwareMap.get(DcMotor.class, "rightBack");
+
+        RightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+        RightRearDrive.setDirection(DcMotor.Direction.REVERSE);
+
+        LeftFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        LeftRearDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        RightFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        RightRearDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+
+
+        armRotServo2 = hardwareMap.servo.get("secServo");
+
+        Plevaka = hardwareMap.get(DcMotor.class, "Plevaka");
+        Plevaka.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        // ===== IMU =====
+        IMU imu = hardwareMap.get(IMU.class, "imu");
+        // Adjust the orientation parameters to match your robot
+        IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+                RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
+                RevHubOrientationOnRobot.UsbFacingDirection.UP));
+        // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
+        imu.initialize(parameters);
+
+        // ===== PID =====
+        tagRotPID = new PIDController(0.04, 0.0, 0.002);
+        tagStrafePID = new PIDController(0.08, 0.0, 0.003);
+
+        waitForStart();
+        headingOffset = imu.getRobotYawPitchRollAngles()
+                .getYaw(AngleUnit.RADIANS);
 
         // ===== LAUNCH STATE MACHINE =====
         ElapsedTime launchTimer = new ElapsedTime();
@@ -42,10 +91,15 @@ public class teleop_decode_2 extends LinearOpMode {
         }
 
         LaunchState launchState = LaunchState.IDLE;
+        armRotServo2.setPosition(0.65);
+
 
 
 
         while (opModeIsActive()) {
+            double heading = imu.getRobotYawPitchRollAngles()
+                    .getYaw(AngleUnit.RADIANS) - headingOffset;
+
 
             if (gamepad1.y && !yPrev) {
                 visionEnabled = !visionEnabled;
@@ -54,10 +108,96 @@ public class teleop_decode_2 extends LinearOpMode {
             }
             yPrev = gamepad1.y;
 
+            if (gamepad1.x) {
+                headingOffset = imu.getRobotYawPitchRollAngles()
+                        .getYaw(AngleUnit.RADIANS);
+            }
+
 
             if (visionEnabled && aprilTag != null) {
                 centerByAprilTag();
                 continue;
+            }
+            // ===== INPUT =====
+            double y = gamepad1.left_stick_y;
+            double x = gamepad1.left_stick_x;
+            double rot = -gamepad1.right_stick_x;
+
+            if (Math.abs(y) < 0.05) y = 0;
+            if (Math.abs(x) < 0.05) x = 0;
+            if (Math.abs(rot) < 0.05) rot = 0;
+
+            // ===== FIELD CENTRIC =====
+            double cosA = Math.cos(heading);
+            double sinA = Math.sin(heading);
+
+            double fieldX = x * cosA - y * sinA;
+            double fieldY = x * sinA + y * cosA;
+
+            // ===== MECANUM =====
+            double lf = fieldY - fieldX + rot;
+            double lb = fieldY + fieldX + rot;
+            double rf = fieldY + fieldX - rot;
+            double rb = fieldY - fieldX - rot;
+            telemetry.addData("rot: ", heading);
+            telemetry.addData("none rot: ", heading);
+            telemetry.update();
+
+
+            // ===== NORMALIZE =====
+            double max = Math.max(
+                    Math.abs(lf),
+                    Math.max(Math.abs(lb), Math.max(Math.abs(rf), Math.abs(rb)))
+            );
+
+            if (max > 1.0) {
+                lf /= max;
+                lb /= max;
+                rf /= max;
+                rb /= max;
+            }
+
+            // ===== DPAD =====
+            if (gamepad1.dpad_up) {
+                lf = 0.3;
+                lb = 0.3;
+                rf = 0.3;
+                rb = 0.3;
+            }
+            if (gamepad1.dpad_down) {
+                lf = -0.3;
+                lb = -0.3;
+                rf = -0.3;
+                rb = -0.3;
+            }
+            if (gamepad1.dpad_left) {
+                lf = -0.4;
+                lb = 0.4;
+                rf = 0.4;
+                rb = -0.4;
+            }
+            if (gamepad1.dpad_right) {
+                lf = 0.4;
+                lb = -0.4;
+                rf = -0.4;
+                rb = 0.4;
+            }
+
+            // ===== APPLY =====
+            LeftFrontDrive.setPower(lf * 0.85);
+            LeftRearDrive.setPower(lb * 0.85);
+            RightFrontDrive.setPower(rf * 0.85);
+            RightRearDrive.setPower(rb * 0.85);
+
+            if (gamepad1.a) {
+                Plevaka.setPower(-0.9);
+                sleep(3500);
+                armRotServo2.setPosition(0);
+                sleep(2500);
+                Plevaka.setPower(0);
+                armRotServo2.setPosition(0.65);
+
+
             }
 
         }
@@ -69,11 +209,19 @@ public class teleop_decode_2 extends LinearOpMode {
     void centerByAprilTag() {
         List<AprilTagDetection> tags = aprilTag.getDetections();
         if (tags.isEmpty()) {
+            stopDrive();
             return;
         }
 
         AprilTagDetection tag = tags.get(0);
 
+        double rot = tagRotPID.update(tag.ftcPose.bearing);
+        double strafe = tagStrafePID.update(-tag.ftcPose.x);
+
+        LeftFrontDrive.setPower((strafe + rot) * 0.8);
+        LeftRearDrive.setPower((-strafe + rot) * 0.8);
+        RightFrontDrive.setPower((-strafe - rot) * 0.8);
+        RightRearDrive.setPower((strafe - rot) * 0.8);
     }
 
     // ===== VISION =====
@@ -91,4 +239,10 @@ public class teleop_decode_2 extends LinearOpMode {
         aprilTag = null;
     }
 
+    void stopDrive() {
+        LeftFrontDrive.setPower(0);
+        LeftRearDrive.setPower(0);
+        RightFrontDrive.setPower(0);
+        RightRearDrive.setPower(0);
+    }
 }
