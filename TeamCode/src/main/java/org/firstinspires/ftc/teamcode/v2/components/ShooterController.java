@@ -10,6 +10,7 @@ public class ShooterController {
 
     private final Shooter sht;
 
+
     public double targetW = 0.0;
     public boolean stop = true;
     public boolean control = false;
@@ -27,7 +28,7 @@ public class ShooterController {
             ConfigShooterController.kd
     );
 
-    public ShooterController(Shooter sht) {
+    public ShooterController(Shooter sht, Shooter shtR, Shooter shtL) {
         this.sht = sht;
     }
 
@@ -35,9 +36,15 @@ public class ShooterController {
         return abs(targetW - vel) < ConfigShooterController.revolutionsThr;
     }
 
+    public void setFeederPower(double power) {
+        sht.setFeederPower(power);
+    }
+
     public void tick() {
         if (control) {
             if (stop) {
+                U = 0.0; //я забыла его сбросить, чтобы не накапливался
+                pid.reset();
                 sht.setShtPower(0.0);
             } else {
                 int ticks = sht.getShtTicks();
@@ -46,7 +53,9 @@ public class ShooterController {
                 vel = (ticks - lastTicks) / t * TICKSTOREV;
                 velTs = timing;
                 lastTicks = ticks;
-                U += pid.tick(targetW - vel) * t;
+
+                U = pid.tick(targetW - vel);
+                U = Math.max(-1.0, Math.min(1.0, U));  //ограничение мощности
                 sht.setShtPower(U);
             }
         }

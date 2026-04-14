@@ -7,6 +7,8 @@ import com.qualcomm.robotcore.hardware.Servo;
 
 
 import static org.firstinspires.ftc.teamcode.v2.util.dashconfigs.ConfigShooter.kSHT;
+import static org.firstinspires.ftc.teamcode.v2.util.dashconfigs.ConfigShooter.kSHT_L;
+import static org.firstinspires.ftc.teamcode.v2.util.dashconfigs.ConfigShooter.kSHT_R;
 
 public class Shooter {
 
@@ -29,7 +31,12 @@ public class Shooter {
         SHT.setPower(pw * kSHT);
     }
 
-    public int getShtTicks() {
+    public void setFeederPower(double pw) {
+        ShtR.setPower(pw * kSHT_R);
+        ShtL.setPower(pw * kSHT_L);
+    }
+
+        public int getShtTicks() {
         return SHT.getCurrentPosition();
     }
 

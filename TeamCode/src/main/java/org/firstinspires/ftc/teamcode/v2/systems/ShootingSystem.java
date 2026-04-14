@@ -19,7 +19,12 @@ public class ShootingSystem {
     public double absY = 0.0;
     public boolean isNear = true;
 
-    public Consumer<Double> setTargetAngleHandler = angle -> {};
+    public Consumer<Double> setTargetAngleHandler = angle -> {
+    };
+
+    private boolean feeding = false;
+    private long feedTimerStart = -1;
+    private static final long FEED_DURATION_MS = 500;
 
     public ShootingSystem(ShooterController shtControl, LookAt lookAt) {
         this.shtControl = shtControl;
@@ -27,6 +32,19 @@ public class ShootingSystem {
     }
 
     public void tick() {
+        if (feeding) {
+            if (System.currentTimeMillis() - feedTimerStart > FEED_DURATION_MS) {
+                shtControl.setFeederPower(0.0);
+                shtControl.stop = true;
+                shtControl.control = false;
+                feeding = false;
+                startShoot = false;
+                positionFixed = false;
+            }
+            shtControl.tick();
+            return;
+        }
+
         if (startShoot && !positionFixed) {
             shtControl.stop = false;
             shtControl.control = true;
@@ -40,16 +58,12 @@ public class ShootingSystem {
         }
 
         if (startShoot && positionFixed && isTargetAngleReady && shtControl.isOnRevolutions()) {
-            shoot();
+            shtControl.setFeederPower(1.0);
+            feeding = true;
+            feedTimerStart = System.currentTimeMillis();
         }
 
         shtControl.tick();
-    }
-
-    private void shoot() {
-        startShoot = false;
-        positionFixed = false;
-        shtControl.stop = true;
     }
 
     public void goShoot(double absX, double absY, boolean isNear) {

@@ -17,8 +17,8 @@ public class WheelBase{
         RightFrontDrive = hardwareMap.get(DcMotor.class, "rightFront");
         RightRearDrive = hardwareMap.get(DcMotor.class, "rightBack");
 
-        RightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        RightRearDrive.setDirection(DcMotor.Direction.REVERSE);
+        LeftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+        LeftRearDrive.setDirection(DcMotor.Direction.REVERSE);
 
         LeftFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         LeftRearDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
